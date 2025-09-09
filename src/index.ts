@@ -6,6 +6,7 @@ import { GLContext } from './gl';
 import { PBRShader } from './shader/pbr-shader';
 import { Texture, Texture2D } from './textures/texture';
 import { UniformType } from './types';
+import { PointLight } from './lights/lights';
 
 // GUI elements
 interface GUIProperties {
@@ -37,6 +38,7 @@ class Application {
       'uMaterial.albedo': vec3.create(),
       'uModel.LS_to_WS': mat4.create(),
       'uCamera.WS_to_CS': mat4.create(),
+      'uCamera.positionWS': this._camera._position,
     };
 
     // Set GUI default values
@@ -129,6 +131,33 @@ class Application {
         this._context.draw(this._geometry, this._shader, this._uniforms);
       }
     }
+
+    // Create our lights
+    const lights: PointLight[] = [];
+
+    const keyLight = new PointLight()
+      .setPosition(5, 5, 5)
+      .setColorRGB(1.0, 0.95, 0.9)
+      .setIntensity(10.0);
+    lights.push(keyLight);
+
+    const fillLight = new PointLight()
+      .setPosition(-3, 2, 4)
+      .setColorRGB(0.6, 0.7, 1.0)
+      .setIntensity(3.0);
+    lights.push(fillLight);
+
+    this._shader.pointLightCount = lights.length;
+    this._context.compileProgram(this._shader);
+
+    // Set the lights uniforms
+    for (let i = 0; i < lights.length; i++) {
+      this._uniforms[`uPointLights[${i}].positionWS`] = lights[i].positionWS;
+      this._uniforms[`uPointLights[${i}].color`] = lights[i].color;
+      this._uniforms[`uPointLights[${i}].intensity`] = lights[i].intensity;
+    }
+
+    this._context.draw(this._geometry, this._shader, this._uniforms);
   }
 }
 
