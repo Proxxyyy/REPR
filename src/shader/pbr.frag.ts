@@ -55,7 +55,11 @@ void main()
     float NdotL = clamp(dot(N, L), 0.0, 1.0);
     //float attenuation = 1.0 / (dist * dist);
     //vec3 radiance = uPointLights[i].color * uPointLights[i].intensity;// * attenuation;
-    irradiance += (uPointLights[i].intensity / (4.0 * 3.14 * length(L))) * NdotL;
+
+    vec3 radiance = (uPointLights[i].intensity / (4.0 * 3.14 * length(L))) * NdotL * vec3(1.0);
+    vec3 radianceACES = clamp((radiance * (2.51 * radiance + 0.03)) / (radiance * (2.43 * radiance + 0.59) + 0.14), vec3(0.0), vec3(1.0));
+
+    irradiance += radianceACES;
   }
 
   /*  vec3 irradiance = vec3(0.0);
@@ -70,8 +74,6 @@ void main()
       irradiance += radiance * NdotL;
     }
   }*/
-
-  // ACES
 
 
   vec3 color = albedo * irradiance;
