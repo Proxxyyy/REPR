@@ -46,19 +46,20 @@ void main()
   // **DO NOT** forget to do all your computation in linear space.
   vec3 albedo = sRGBToLinear(vec4(uMaterial.albedo, 1.0)).rgb;
 
-  // Basic lambert diffuse with inverse-square attenuation from point lights.
   vec3 N = normalize(vNormalWS);
-
-  vec3 irradiance = vec3(0.0);
+  vec3 L0 = vec3(0.0);
   for (int i = 0; i < POINT_LIGHT_COUNT; ++i) {
-    vec3 L = uPointLights[i].positionWS - vPositionWS;
+    vec3 L = normalize(uPointLights[i].positionWS - vPositionWS);
     float NdotL = clamp(dot(N, L), 0.0, 1.0);
     //float attenuation = 1.0 / (dist * dist);
     //vec3 radiance = uPointLights[i].color * uPointLights[i].intensity;// * attenuation;
 
-    vec3 radiance = (uPointLights[i].intensity / (4.0 * 3.14 * length(L))) * NdotL * vec3(1.0);
+    vec3 Li = (uPointLights[i].intensity / (4.0 * 3.14 * length(L))) * NdotL * vec3(1.0);
 
-    irradiance += radiance;
+    vec3 fd = albedo / 3.14;
+    vec3 fr = fd; // + fs;
+
+    L0 += fr * Li;
   }
 
   /*  vec3 irradiance = vec3(0.0);
@@ -74,9 +75,6 @@ void main()
     }
   }*/
 
-
-  vec3 color = albedo * irradiance;
-
   // NormalWS
   // vec3 NormalWS = (vNormalWS + 1.0) / 2.0;
   // outFragColor = LinearTosRGB(vec4(NormalWS, 1.0));
@@ -86,7 +84,7 @@ void main()
   // outFragColor = LinearTosRGB(vec4(ViewDirectionWS, 1.0));
 
   // ACES
-  vec3 colorACES = clamp((color * (2.51 * color + 0.03)) / (color * (2.43 * color + 0.59) + 0.14), vec3(0.0), vec3(1.0));
+  vec3 colorACES = clamp((L0 * (2.51 * L0 + 0.03)) / (L0 * (2.43 * L0 + 0.59) + 0.14), vec3(0.0), vec3(1.0));
 
   outFragColor = LinearTosRGB(vec4(colorACES, 1.0));
 }
