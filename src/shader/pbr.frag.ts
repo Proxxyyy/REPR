@@ -57,9 +57,8 @@ void main()
     //vec3 radiance = uPointLights[i].color * uPointLights[i].intensity;// * attenuation;
 
     vec3 radiance = (uPointLights[i].intensity / (4.0 * 3.14 * length(L))) * NdotL * vec3(1.0);
-    vec3 radianceACES = clamp((radiance * (2.51 * radiance + 0.03)) / (radiance * (2.43 * radiance + 0.59) + 0.14), vec3(0.0), vec3(1.0));
 
-    irradiance += radianceACES;
+    irradiance += radiance;
   }
 
   /*  vec3 irradiance = vec3(0.0);
@@ -86,6 +85,9 @@ void main()
   // vec3 ViewDirectionWS = normalize(uCamera.positionWS - vPositionWS);
   // outFragColor = LinearTosRGB(vec4(ViewDirectionWS, 1.0));
 
-  outFragColor = LinearTosRGB(vec4(color, 1.0));
+  // ACES
+  vec3 colorACES = clamp((color * (2.51 * color + 0.03)) / (color * (2.43 * color + 0.59) + 0.14), vec3(0.0), vec3(1.0));
+
+  outFragColor = LinearTosRGB(vec4(colorACES, 1.0));
 }
 `;
