@@ -47,41 +47,46 @@ void main()
   vec3 albedo = sRGBToLinear(vec4(uMaterial.albedo, 1.0)).rgb;
 
   vec3 n = normalize(vNormalWS);
-  vec3 w0 = normalize(uCamera.positionWS - vPositionWS);
-  float nDOTw0 = clamp(dot(n, w0), 0.0, 1.0);
-  vec3 L0 = vec3(0.0);
+  vec3 w_o = normalize(uCamera.positionWS - vPositionWS);
+  float nDOTw_o = clamp(dot(n, w_o), 0.0, 1.0);
+  vec3 irradiance = vec3(0.0);
   for (int i = 0; i < POINT_LIGHT_COUNT; ++i) {
-    vec3 wi = normalize(uPointLights[i].positionWS - vPositionWS);
-    float nDOTwi = clamp(dot(n, wi), 0.0, 1.0);
+    vec3 w_i = normalize(uPointLights[i].positionWS - vPositionWS);
+    float nDOTw_i = clamp(dot(n, w_i), 0.0, 1.0);
 
     // PointLight intensity
-    vec3 Li = (uPointLights[i].intensity / (4.0 * 3.14 * length(wi))) * nDOTwi * vec3(1.0);
+    vec3 Li = (uPointLights[i].intensity / (4.0 * 3.14 * length(w_i))) * nDOTw_i * vec3(1.0);
 
     // Diffuse
     vec3 fd = albedo / 3.14;
     
-    // Specular
-    vec3 h = normalize(w0 + wi); // Halfway vector
+    // Specular (Cook-Torrance GGX model)
+    // Normal Distribution Function
+    vec3 h = normalize(w_o + w_i); // Halfway vector
     float a = 0.1; // Roughness
     float D = (a * a) / (3.14 * pow((pow(dot(n, h), 2.0) * (a * a - 1.0) + 1.0), 2.0) /*+ 0.001*/); // + 0.001
     
+    // Geometry Function (Smith masking function with Schlick-GGX function)
     float k = pow(a + 1.0, 2.0) / 8.0;
-    float Gshadowing = nDOTwi / (nDOTwi * (1.0 - k) + k);
-    float Gobstruction = nDOTw0 / (nDOTw0 * (1.0 - k) + k);
+    float Gshadowing = nDOTw_i / (nDOTw_i * (1.0 - k) + k);
+    float Gobstruction = nDOTw_o / (nDOTw_o * (1.0 - k) + k);
     float G = Gshadowing * Gobstruction;
 
-    // TODO: handle metals
-    vec3 F = vec3(0.04); // Dielectric
-
-    vec3 fs = D * F * G / (4.0 * nDOTw0 * nDOTwi); // + 0.001
+    // Specular Function (whithout Fresnel term)
+    vec3 fs = D * G / (4.0 * nDOTw_o * nDOTw_i) * vec3(1.0); // + 0.001
     
+    // Fresnel Function (Schlick's approximation)
+    float ior = 0.5; // Index of Refraction
+    float F0 = pow(ior - 1.0, 2.0) / pow(ior + 1.0, 2.0);
+    float F = F0 + (1.0 - F0) * pow(1.0 - clamp(dot(h, w_o), 0.0, 1.0), 5.0);
+
     // BRDF
-    float kd = 0.5;
-    float ks = 0.5;
+    float kd = 1.0 - F;
+    float ks = F;
     vec3 fr = kd * fd + ks * fs;
 
     // Rendering equation
-    L0 += clamp(fr * Li, vec3(0.0), vec3(1.0));
+    irradiance += clamp(fr * Li, vec3(0.0), vec3(1.0));
   }
 
   // NormalWS
@@ -93,7 +98,7 @@ void main()
   // outFragColor = LinearTosRGB(vec4(ViewDirectionWS, 1.0));
 
   // ACES
-  vec3 colorACES = clamp((L0 * (2.51 * L0 + 0.03)) / (L0 * (2.43 * L0 + 0.59) + 0.14), vec3(0.0), vec3(1.0));
+  vec3 colorACES = clamp((irradiance * (2.51 * irradiance + 0.03)) / (irradiance * (2.43 * irradiance + 0.59) + 0.14), vec3(0.0), vec3(1.0));
 
   outFragColor = LinearTosRGB(vec4(colorACES, 1.0));
 }
