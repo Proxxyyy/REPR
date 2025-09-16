@@ -41,6 +41,56 @@ vec4 LinearTosRGB( in vec4 value ) {
 	return vec4( mix( pow( value.rgb, vec3( 0.41666 ) ) * 1.055 - vec3( 0.055 ), value.rgb * 12.92, vec3( lessThanEqual( value.rgb, vec3( 0.0031308 ) ) ) ), value.a );
 }
 
+int getColumnIndex(float x) {
+  if (x < -3.75) {
+    return 0;
+  } else if (x < -1.25) {
+    return 1;
+  } else if (x < 1.25) {
+    return 2;
+  } else if (x < 3.75) {
+    return 3;
+  } else {
+    return 4;
+  }
+}
+
+int getRowIndex(float y) {
+  if (y < -3.75) {
+    return 0;
+  } else if (y < -1.25) {
+    return 1;
+  } else if (y < 1.25) {
+    return 2;
+  } else if (y < 3.75) {
+    return 3;
+  } else {
+    return 4;
+  }
+}
+
+float columnIndexToRoughness(int index) {
+  switch(index) {
+    case 0: return 0.05;
+    case 1: return 0.25;
+    case 2: return 0.5;
+    case 3: return 0.75;
+    case 4: return 0.95;
+    default: return 0.5;
+  }
+}
+
+float rowIndexToIOR(int index) {
+  switch(index) {
+    case 0: return 1.0;
+    case 1: return 1.1;
+    case 2: return 1.3;
+    case 3: return 2.0;
+    case 4: return 3.0;
+    default: return 1.5;
+  }
+}
+
 void main()
 {
   // **DO NOT** forget to do all your computation in linear space.
@@ -49,6 +99,9 @@ void main()
   vec3 n = normalize(vNormalWS);
   vec3 w_o = normalize(uCamera.positionWS - vPositionWS);
   float nDOTw_o = clamp(dot(n, w_o), 0.0, 1.0);
+  float a = columnIndexToRoughness(getColumnIndex(vPositionWS.x)); // Roughness
+  float ior = rowIndexToIOR(getRowIndex(vPositionWS.y)); // Index of Refraction
+
   vec3 irradiance = vec3(0.0);
   for (int i = 0; i < POINT_LIGHT_COUNT; ++i) {
     vec3 w_i = normalize(uPointLights[i].positionWS - vPositionWS);
@@ -56,14 +109,15 @@ void main()
 
     // PointLight intensity
     vec3 Li = (uPointLights[i].intensity / (4.0 * 3.14 * length(w_i))) * nDOTw_i * vec3(1.0);
+    Li *= uPointLights[i].color;
 
     // Diffuse
     vec3 fd = albedo / 3.14;
+    fd *= a; // Energy conservation
     
     // Specular (Cook-Torrance GGX model)
     // Normal Distribution Function
     vec3 h = normalize(w_o + w_i); // Halfway vector
-    float a = 0.1; // Roughness
     float D = (a * a) / (3.14 * pow((pow(dot(n, h), 2.0) * (a * a - 1.0) + 1.0), 2.0) /*+ 0.001*/); // + 0.001
     
     // Geometry Function (Smith masking function with Schlick-GGX function)
@@ -76,9 +130,8 @@ void main()
     vec3 fs = D * G / (4.0 * nDOTw_o * nDOTw_i) * vec3(1.0); // + 0.001
     
     // Fresnel Function (Schlick's approximation)
-    float ior = 0.5; // Index of Refraction
     float F0 = pow(ior - 1.0, 2.0) / pow(ior + 1.0, 2.0);
-    float F = F0 + (1.0 - F0) * pow(1.0 - clamp(dot(h, w_o), 0.0, 1.0), 5.0);
+    float F = F0 + (1.0 - F0) * pow(1.0 - clamp(dot(w_o, h), 0.0, 1.0), 5.0);
 
     // BRDF
     float kd = 1.0 - F;

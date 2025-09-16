@@ -135,7 +135,7 @@ class Application {
     // Create our lights
     const lights: PointLight[] = [];
 
-    const topLight = new PointLight()
+    /*const topLight = new PointLight()
       .setPosition(0, 7, 5)
       .setColorRGB(1.0, 1.0, 1.0)
       .setIntensity(10.0);
@@ -145,7 +145,33 @@ class Application {
       .setPosition(8, -1, 5)
       .setColorRGB(1.0, 0.1, 0.1)
       .setIntensity(3.0);
-    lights.push(sideLight);
+    lights.push(sideLight);*/
+
+
+    const cyan: [number, number, number] = [0, 1.0, 0.95];
+    const topLeftLight = new PointLight()
+      .setPosition(-6, 6, 5)
+      .setColorRGB(...cyan)
+      .setIntensity(10.0);
+    lights.push(topLeftLight);
+
+    const topRightLight = new PointLight()
+      .setPosition(6, 6, 5)
+      .setColorRGB(...cyan)
+      .setIntensity(10.0);
+    lights.push(topRightLight);
+
+    const bottomLeftLight = new PointLight()
+      .setPosition(-6, -6, 5)
+      .setColorRGB(...cyan)
+      .setIntensity(10.0);
+    lights.push(bottomLeftLight);
+
+    const bottomRightLight = new PointLight()
+      .setPosition(6, -6, 5)
+      .setColorRGB(...cyan)
+      .setIntensity(10.0);
+    lights.push(bottomRightLight);
 
     this._shader.pointLightCount = lights.length;
     this._context.compileProgram(this._shader);
