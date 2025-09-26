@@ -23,7 +23,7 @@ class Application {
   private _shader: PBRShader;
   private _geometry: SphereGeometry;
   private _uniforms: Record<string, UniformType | Texture>;
-  private _textureExample: Texture2D<HTMLElement> | null;
+  private _texture: Texture2D<HTMLElement> | null;
   private _camera: Camera;
   private _guiProperties: GUIProperties; // Object updated with the properties from the GUI
 
@@ -33,7 +33,7 @@ class Application {
     this._camera = new Camera(0.0, 0.0, 18.0);
     this._geometry = new SphereGeometry();
     this._shader = new PBRShader();
-    this._textureExample = null;
+    this._texture = null;
     this._uniforms = {
       'uMaterial.albedo': vec3.create(),
       'uModel.LS_to_WS': mat4.create(),
@@ -60,13 +60,33 @@ class Application {
     this._context.compileProgram(this._shader);
 
     // Example showing how to load a texture and upload it to GPU.
-    this._textureExample = await Texture2D.load(
+    this._texture = await Texture2D.load(
       'assets/env/Alexs_Apt_2k-diffuse-RGBM.png'
+      //'assets/env/interior-diffuse-RGBM.png'
     );
-    if (this._textureExample !== null) {
-      this._context.uploadTexture(this._textureExample);
+    if (this._texture !== null) {
+      this._context.uploadTexture(this._texture);
       // You can then use it directly as a uniform:
-      this._uniforms['uDiffuseTexture'] = this._textureExample;
+      this._uniforms['uDiffuseTexture'] = this._texture;
+    }
+
+    this._texture = await Texture2D.load(
+      'assets/env/Alexs_Apt_2k-specular-RGBM.png'
+      //'assets/env/interior-specular-RGBM.png'
+    );
+    if (this._texture !== null) {
+      this._context.uploadTexture(this._texture);
+      // You can then use it directly as a uniform:
+      this._uniforms['uSpecularTexture'] = this._texture;
+    }
+
+    this._texture = await Texture2D.load(
+      'assets/ggx-brdf-integrated.png'
+    );
+    if (this._texture !== null) {
+      this._context.uploadTexture(this._texture);
+      // You can then use it directly as a uniform:
+      this._uniforms['uBRDFTexture'] = this._texture;
     }
 
     // Handle keyboard and mouse inputs to translate and rotate camera.
@@ -149,7 +169,7 @@ class Application {
 
 
     const cyan: [number, number, number] = [0, 1.0, 0.95];
-    const white: [number, number, number] = [1.0, 1.0, 1.0];
+    //const white: [number, number, number] = [1.0, 1.0, 1.0];
     const topLeftLight = new PointLight()
       .setPosition(-6, 6, 5)
       .setColorRGB(...cyan)

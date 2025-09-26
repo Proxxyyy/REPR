@@ -32,6 +32,8 @@ struct PointLight
 uniform PointLight uPointLights[POINT_LIGHT_COUNT];
 
 uniform sampler2D uDiffuseTexture;
+uniform sampler2D uSpecularTexture;
+uniform sampler2D uBRDFTexture;
 
 float PI = 3.14159265359;
 
@@ -61,6 +63,18 @@ vec2 ToUV(vec3 direction) {
   vec2 spherical = cartesianToSpherical(direction);
   vec2 remapSpherical = 0.5 * (spherical / vec2(PI, PI / 2.0) + 1.0);
   return vec2(remapSpherical.x, 1.0 - remapSpherical.y);
+}
+
+vec2 offsetUV(vec2 uv, int roughnessLevel) {
+  switch(roughnessLevel) {
+    case 0: return vec2(uv.x, uv.y / 2.0);
+    case 1: return vec2(uv.x / 2.0, uv.y / 4.0 + 0.5);
+    case 2: return vec2(uv.x / 4.0, uv.y / 8.0 + 0.75);
+    case 3: return vec2(uv.x / 8.0, uv.y / 16.0 + 0.875);
+    case 4: return vec2(uv.x / 16.0, uv.y / 32.0 + 0.9375);
+    case 5: return vec2(uv.x / 32.0, uv.y / 64.0 + 0.96875);
+    default: return uv;
+  }
 }
 
 int getColumnIndex(float x) {
@@ -93,11 +107,11 @@ int getRowIndex(float y) {
 
 float columnIndexToRoughness(int index) {
   switch(index) {
-    case 0: return 0.1;
-    case 1: return 0.3;
-    case 2: return 0.5;
-    case 3: return 0.7;
-    case 4: return 0.9;
+    case 0: return 1.0 / 12.0;
+    case 1: return 3.0 / 12.0;
+    case 2: return 5.0 / 12.0;
+    case 3: return 7.0 / 12.0;
+    case 4: return 9.0 / 12.0;
     default: return 0.5;
   }
 }
@@ -105,10 +119,10 @@ float columnIndexToRoughness(int index) {
 float rowIndexToMetallic(int index) {
   switch(index) {
     case 0: return 0.1;
-    case 1: return 0.3;
-    case 2: return 0.5;
-    case 3: return 0.7;
-    case 4: return 0.9;
+    case 1: return 0.2;
+    case 2: return 0.3;
+    case 3: return 0.4;
+    case 4: return 0.5;
     default: return 0.5;
   }
 }
@@ -121,8 +135,12 @@ void main()
   vec3 n = normalize(vNormalWS);
   vec3 w_o = normalize(uCamera.positionWS - vPositionWS);
   float nDOTw_o = clamp(dot(n, w_o), 0.0, 1.0);
-  float a = columnIndexToRoughness(getColumnIndex(vPositionWS.x)); // Roughness
-  float metallic = rowIndexToMetallic(getRowIndex(vPositionWS.y)); // Mettalic
+  float a = columnIndexToRoughness(getColumnIndex(vPositionWS.x));
+  float metallic = rowIndexToMetallic(getRowIndex(vPositionWS.y));
+
+  ///////////
+  /// IBL ///
+  ///////////
 
   // IBL Generation
   /*vec3 irradiance = vec3(0.0);
@@ -141,10 +159,43 @@ void main()
   irradiance = irradiance * (1.0 - metallic);*/
 
   // IBL Sampling
-  vec3 diffuse = RGBMDecode(texture(uDiffuseTexture, ToUV(n)));
-  vec3 irradiance = diffuse * (1.0 - metallic);
+  float dielectricF0 = 0.04;
+  float metallicF0 = albedo.r + albedo.g + albedo.b / 3.0;
+  float F0 = mix(dielectricF0, metallicF0, metallic);
+  float F = F0 + (1.0 - F0) * pow(1.0 - clamp(dot(w_o, n), 0.0, 1.0), 5.0);
 
-  // Direct lighting
+  vec3 ks = F * vec3(1.0);
+  vec3 kd = (1.0 - ks) * (1.0 - metallic);
+
+  vec3 diffuse = kd * albedo * RGBMDecode(texture(uDiffuseTexture, ToUV(n)));
+
+  vec2 reflected = ToUV(reflect(w_o, n));
+
+  int upperRoughnessLevel = min(int(a * 6.0) + 1, 5);
+  int lowerRoughnessLevel = int(a * 6.0);
+  //int lowerRoughnessLevel = clamp(int(a * 6.0), 0, 4);
+  //int upperRoughnessLevel = lowerRoughnessLevel + 1;
+
+  float distanceToUpper = float(upperRoughnessLevel) / 6.0 - a;
+  float distanceToLower = a - float(lowerRoughnessLevel) / 6.0;
+  float totalDistance = distanceToUpper + distanceToLower;
+  float upperLerpFactor = distanceToLower / totalDistance;
+
+  vec2 upperSpecularUV = offsetUV(reflected, upperRoughnessLevel);
+  vec2 lowerSpecularUV = offsetUV(reflected, lowerRoughnessLevel);
+  vec3 upperSpecular = RGBMDecode(texture(uSpecularTexture, upperSpecularUV));
+  vec3 lowerSpecular = RGBMDecode(texture(uSpecularTexture, lowerSpecularUV));
+  vec3 specular = mix(lowerSpecular, upperSpecular, upperLerpFactor);
+
+  vec2 BRDF = sRGBToLinear(texture(uBRDFTexture, vec2(nDOTw_o, a))).xy;
+  vec3 specularBRDF = specular * (ks * BRDF.x + BRDF.y);
+
+  vec3 irradiance = diffuse + specularBRDF;
+
+  ////////////
+  //// DL ////
+  ////////////
+
   /*vec3 irradiance = vec3(0.0);
   for (int i = 0; i < POINT_LIGHT_COUNT; ++i) {
     vec3 w_i = normalize(uPointLights[i].positionWS - vPositionWS);
@@ -195,9 +246,7 @@ void main()
   // vec3 ViewDirectionWS = normalize(uCamera.positionWS - vPositionWS);
   // outFragColor = LinearTosRGB(vec4(ViewDirectionWS, 1.0));
 
-  // ACES
   vec3 colorACES = clamp((irradiance * (2.51 * irradiance + 0.03)) / (irradiance * (2.43 * irradiance + 0.59) + 0.14), vec3(0.0), vec3(1.0));
-
   outFragColor = LinearTosRGB(vec4(colorACES, 1.0));
 }
 `;
