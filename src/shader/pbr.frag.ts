@@ -31,6 +31,10 @@ struct PointLight
 };
 uniform PointLight uPointLights[POINT_LIGHT_COUNT];
 
+uniform sampler2D uDiffuseTexture;
+
+float PI = 3.14159265359;
+
 // From three.js
 vec4 sRGBToLinear( in vec4 value ) {
 	return vec4( mix( pow( value.rgb * 0.9478672986 + vec3( 0.0521327014 ), vec3( 2.4 ) ), value.rgb * 0.0773993808, vec3( lessThanEqual( value.rgb, vec3( 0.04045 ) ) ) ), value.a );
@@ -43,6 +47,20 @@ vec4 LinearTosRGB( in vec4 value ) {
 
 vec3 RGBMDecode(vec4 rgbm) {
   return 6.0 * rgbm.rgb * rgbm.a;
+}
+
+vec2 cartesianToSpherical(vec3 cartesian) {
+  // Compute azimuthal angle, in [-PI, PI]
+  float phi = atan(cartesian.z, cartesian.x);
+  // Compute polar angle, in [-PI/2, PI/2]
+  float theta = asin(cartesian.y);
+  return vec2(phi, theta);
+}
+
+vec2 ToUV(vec3 direction) {
+  vec2 spherical = cartesianToSpherical(direction);
+  vec2 remapSpherical = 0.5 * (spherical / vec2(PI, PI / 2.0) + 1.0);
+  return vec2(remapSpherical.x, 1.0 - remapSpherical.y);
 }
 
 int getColumnIndex(float x) {
@@ -75,11 +93,11 @@ int getRowIndex(float y) {
 
 float columnIndexToRoughness(int index) {
   switch(index) {
-    case 0: return 0.01;
-    case 1: return 0.1;
-    case 2: return 0.2;
-    case 3: return 0.3;
-    case 4: return 0.5;
+    case 0: return 0.1;
+    case 1: return 0.3;
+    case 2: return 0.5;
+    case 3: return 0.7;
+    case 4: return 0.9;
     default: return 0.5;
   }
 }
@@ -87,11 +105,11 @@ float columnIndexToRoughness(int index) {
 float rowIndexToMetallic(int index) {
   switch(index) {
     case 0: return 0.1;
-    case 1: return 0.1;
-    case 2: return 0.2;
-    case 3: return 0.3;
-    case 4: return 0.4;
-    default: return 0.2;
+    case 1: return 0.3;
+    case 2: return 0.5;
+    case 3: return 0.7;
+    case 4: return 0.9;
+    default: return 0.5;
   }
 }
 
@@ -106,23 +124,44 @@ void main()
   float a = columnIndexToRoughness(getColumnIndex(vPositionWS.x)); // Roughness
   float metallic = rowIndexToMetallic(getRowIndex(vPositionWS.y)); // Mettalic
 
-  vec3 irradiance = vec3(0.0);
+  // IBL Generation
+  /*vec3 irradiance = vec3(0.0);
+  int count = 0;
+  for(float phi = 0.0; phi < 2.0 * PI; phi += 0.25)
+  {
+    for(float theta = 0.0; theta < 0.5 * PI; theta += 0.25)
+    {
+        // Direction must be updated using phi and theta.
+        vec3 direction = 
+        irradiance += RGBMDecode(texture(uDiffuseTexture, ToUV(direction))) * cos(theta) * sin(theta);;
+        count++;
+    }
+  }
+  irradiance = PI * irradiance / float(count);
+  irradiance = irradiance * (1.0 - metallic);*/
+
+  // IBL Sampling
+  vec3 diffuse = RGBMDecode(texture(uDiffuseTexture, ToUV(n)));
+  vec3 irradiance = envColor * (1.0 - metallic);
+
+  // Direct lighting
+  /*vec3 irradiance = vec3(0.0);
   for (int i = 0; i < POINT_LIGHT_COUNT; ++i) {
     vec3 w_i = normalize(uPointLights[i].positionWS - vPositionWS);
     float nDOTw_i = clamp(dot(n, w_i), 0.0, 1.0);
 
     // PointLight intensity
-    vec3 Li = (uPointLights[i].intensity / (4.0 * 3.14 * length(w_i))) * nDOTw_i * vec3(1.0);
+    vec3 Li = (uPointLights[i].intensity / (4.0 * PI * length(w_i))) * nDOTw_i * vec3(1.0);
     Li *= uPointLights[i].color;
 
     // Diffuse
-    vec3 fd = albedo / 3.14;
+    vec3 fd = albedo / PI;
     fd *= (1.0 - metallic);
     
     // Specular (Cook-Torrance GGX model)
     // Normal Distribution Function
     vec3 h = normalize(w_o + w_i); // Halfway vector
-    float D = (a * a) / (3.14 * pow((pow(dot(n, h), 2.0) * (a * a - 1.0) + 1.0), 2.0) /*+ 0.001*/); // + 0.001
+    float D = (a * a) / (PI * pow((pow(dot(n, h), 2.0) * (a * a - 1.0) + 1.0), 2.0)); // + 0.001
     
     // Geometry Function (Smith masking function with Schlick-GGX function)
     float k = pow(a + 1.0, 2.0) / 8.0;
@@ -137,7 +176,6 @@ void main()
     float dielectricF0 = 0.04;
     float metallicF0 = albedo.r + albedo.g + albedo.b / 3.0;
     float F0 = mix(dielectricF0, metallicF0, metallic);
-    F0 = dielectricF0 * (1.0 - metallic) + metallic * metallicF0;
     float F = F0 + (1.0 - F0) * pow(1.0 - clamp(dot(w_o, h), 0.0, 1.0), 5.0);
 
     // BRDF
@@ -147,7 +185,7 @@ void main()
 
     // Rendering equation
     irradiance += clamp(fr * Li, vec3(0.0), vec3(1.0));
-  }
+  }*/
 
   // NormalWS
   // vec3 NormalWS = (vNormalWS + 1.0) / 2.0;
