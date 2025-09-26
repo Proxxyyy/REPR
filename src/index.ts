@@ -149,6 +149,7 @@ class Application {
 
 
     const cyan: [number, number, number] = [0, 1.0, 0.95];
+    const white: [number, number, number] = [1.0, 1.0, 1.0];
     const topLeftLight = new PointLight()
       .setPosition(-6, 6, 5)
       .setColorRGB(...cyan)

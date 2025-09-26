@@ -41,6 +41,10 @@ vec4 LinearTosRGB( in vec4 value ) {
 	return vec4( mix( pow( value.rgb, vec3( 0.41666 ) ) * 1.055 - vec3( 0.055 ), value.rgb * 12.92, vec3( lessThanEqual( value.rgb, vec3( 0.0031308 ) ) ) ), value.a );
 }
 
+vec3 RGBMDecode(vec4 rgbm) {
+  return 6.0 * rgbm.rgb * rgbm.a;
+}
+
 int getColumnIndex(float x) {
   if (x < -3.75) {
     return 0;
@@ -71,23 +75,23 @@ int getRowIndex(float y) {
 
 float columnIndexToRoughness(int index) {
   switch(index) {
-    case 0: return 0.05;
-    case 1: return 0.25;
-    case 2: return 0.5;
-    case 3: return 0.75;
-    case 4: return 0.95;
+    case 0: return 0.01;
+    case 1: return 0.1;
+    case 2: return 0.2;
+    case 3: return 0.3;
+    case 4: return 0.5;
     default: return 0.5;
   }
 }
 
-float rowIndexToIOR(int index) {
+float rowIndexToMetallic(int index) {
   switch(index) {
-    case 0: return 1.0;
-    case 1: return 1.1;
-    case 2: return 1.3;
-    case 3: return 2.0;
-    case 4: return 3.0;
-    default: return 1.5;
+    case 0: return 0.1;
+    case 1: return 0.1;
+    case 2: return 0.2;
+    case 3: return 0.3;
+    case 4: return 0.4;
+    default: return 0.2;
   }
 }
 
@@ -100,7 +104,7 @@ void main()
   vec3 w_o = normalize(uCamera.positionWS - vPositionWS);
   float nDOTw_o = clamp(dot(n, w_o), 0.0, 1.0);
   float a = columnIndexToRoughness(getColumnIndex(vPositionWS.x)); // Roughness
-  float ior = rowIndexToIOR(getRowIndex(vPositionWS.y)); // Index of Refraction
+  float metallic = rowIndexToMetallic(getRowIndex(vPositionWS.y)); // Mettalic
 
   vec3 irradiance = vec3(0.0);
   for (int i = 0; i < POINT_LIGHT_COUNT; ++i) {
@@ -113,7 +117,7 @@ void main()
 
     // Diffuse
     vec3 fd = albedo / 3.14;
-    fd *= a; // Energy conservation
+    fd *= (1.0 - metallic);
     
     // Specular (Cook-Torrance GGX model)
     // Normal Distribution Function
@@ -130,7 +134,10 @@ void main()
     vec3 fs = D * G / (4.0 * nDOTw_o * nDOTw_i) * vec3(1.0); // + 0.001
     
     // Fresnel Function (Schlick's approximation)
-    float F0 = pow(ior - 1.0, 2.0) / pow(ior + 1.0, 2.0);
+    float dielectricF0 = 0.04;
+    float metallicF0 = albedo.r + albedo.g + albedo.b / 3.0;
+    float F0 = mix(dielectricF0, metallicF0, metallic);
+    F0 = dielectricF0 * (1.0 - metallic) + metallic * metallicF0;
     float F = F0 + (1.0 - F0) * pow(1.0 - clamp(dot(w_o, h), 0.0, 1.0), 5.0);
 
     // BRDF
