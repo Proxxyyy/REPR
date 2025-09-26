@@ -107,11 +107,11 @@ int getRowIndex(float y) {
 
 float columnIndexToRoughness(int index) {
   switch(index) {
-    case 0: return 1.0 / 12.0;
-    case 1: return 3.0 / 12.0;
-    case 2: return 5.0 / 12.0;
-    case 3: return 7.0 / 12.0;
-    case 4: return 9.0 / 12.0;
+    case 0: return 0.005;
+    case 1: return 1.0 / 12.0;
+    case 2: return 2.0 / 12.0;
+    case 3: return 5.0 / 12.0;
+    case 4: return 7.0 / 12.0;
     default: return 0.5;
   }
 }
@@ -119,10 +119,10 @@ float columnIndexToRoughness(int index) {
 float rowIndexToMetallic(int index) {
   switch(index) {
     case 0: return 0.1;
-    case 1: return 0.2;
-    case 2: return 0.3;
-    case 3: return 0.4;
-    case 4: return 0.5;
+    case 1: return 0.3;
+    case 2: return 0.5;
+    case 3: return 0.7;
+    case 4: return 0.9;
     default: return 0.5;
   }
 }
@@ -159,12 +159,11 @@ void main()
   irradiance = irradiance * (1.0 - metallic);*/
 
   // IBL Sampling
-  float dielectricF0 = 0.04;
-  float metallicF0 = albedo.r + albedo.g + albedo.b / 3.0;
-  float F0 = mix(dielectricF0, metallicF0, metallic);
-  float F = F0 + (1.0 - F0) * pow(1.0 - clamp(dot(w_o, n), 0.0, 1.0), 5.0);
+  vec3 dielectricF0 = 0.04 * vec3(1.0);
+  vec3 F0 = mix(dielectricF0, albedo, metallic);
+  vec3 F = F0 + (1.0 - F0) * pow(1.0 - clamp(dot(w_o, n), 0.0, 1.0), 5.0);
 
-  vec3 ks = F * vec3(1.0);
+  vec3 ks = F;
   vec3 kd = (1.0 - ks) * (1.0 - metallic);
 
   vec3 diffuse = kd * albedo * RGBMDecode(texture(uDiffuseTexture, ToUV(n)));
@@ -207,7 +206,6 @@ void main()
 
     // Diffuse
     vec3 fd = albedo / PI;
-    fd *= (1.0 - metallic);
     
     // Specular (Cook-Torrance GGX model)
     // Normal Distribution Function
@@ -224,14 +222,15 @@ void main()
     vec3 fs = D * G / (4.0 * nDOTw_o * nDOTw_i) * vec3(1.0); // + 0.001
     
     // Fresnel Function (Schlick's approximation)
-    float dielectricF0 = 0.04;
-    float metallicF0 = albedo.r + albedo.g + albedo.b / 3.0;
-    float F0 = mix(dielectricF0, metallicF0, metallic);
-    float F = F0 + (1.0 - F0) * pow(1.0 - clamp(dot(w_o, h), 0.0, 1.0), 5.0);
+    vec3 dielectricF0 = 0.04 * vec3(1.0);
+    vec3 F0 = mix(dielectricF0, albedo, metallic);
+    vec3 F = F0 + (1.0 - F0) * pow(1.0 - clamp(dot(w_o, h), 0.0, 1.0), 5.0);
 
     // BRDF
-    float kd = 1.0 - F;
-    float ks = F;
+    vec3 ks = F;
+    vec3 kd = 1.0 - ks;
+    kd *= (1.0 - metallic);
+
     vec3 fr = kd * fd + ks * fs;
 
     // Rendering equation
