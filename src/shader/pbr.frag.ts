@@ -142,7 +142,7 @@ void main()
 
   // IBL Sampling
   vec3 diffuse = RGBMDecode(texture(uDiffuseTexture, ToUV(n)));
-  vec3 irradiance = envColor * (1.0 - metallic);
+  vec3 irradiance = diffuse * (1.0 - metallic);
 
   // Direct lighting
   /*vec3 irradiance = vec3(0.0);
