@@ -56,10 +56,60 @@ class Application {
    * Initializes the application.
    */
   async init() {
+    // Create the point lights
+    const lights: PointLight[] = [];
+    const cyan: [number, number, number] = [0, 1.0, 0.95];
+    //const white: [number, number, number] = [1.0, 1.0, 1.0];
+
+    /*const topLight = new PointLight()
+      .setPosition(0, 7, 5)
+      .setColorRGB(1.0, 1.0, 1.0)
+      .setIntensity(10.0);
+    lights.push(topLight);
+
+    const sideLight = new PointLight()
+      .setPosition(8, -1, 5)
+      .setColorRGB(1.0, 0.1, 0.1)
+      .setIntensity(3.0);
+    lights.push(sideLight);*/
+
+    const topLeftLight = new PointLight()
+      .setPosition(-6, 6, 5)
+      .setColorRGB(...cyan)
+      .setIntensity(10.0);
+    lights.push(topLeftLight);
+
+    const topRightLight = new PointLight()
+      .setPosition(6, 6, 5)
+      .setColorRGB(...cyan)
+      .setIntensity(10.0);
+    lights.push(topRightLight);
+
+    const bottomLeftLight = new PointLight()
+      .setPosition(-6, -6, 5)
+      .setColorRGB(...cyan)
+      .setIntensity(10.0);
+    lights.push(bottomLeftLight);
+
+    const bottomRightLight = new PointLight()
+      .setPosition(6, -6, 5)
+      .setColorRGB(...cyan)
+      .setIntensity(10.0);
+    lights.push(bottomRightLight);
+
+    this._shader.pointLightCount = lights.length;
+
+    for (let i = 0; i < lights.length; i++) {
+      this._uniforms[`uPointLights[${i}].positionWS`] = lights[i].positionWS;
+      this._uniforms[`uPointLights[${i}].color`] = lights[i].color;
+      this._uniforms[`uPointLights[${i}].intensity`] = lights[i].intensity;
+    }
+
+    // Compile before loading textures to prevent GL errors
     this._context.uploadGeometry(this._geometry);
     this._context.compileProgram(this._shader);
 
-    // Example showing how to load a texture and upload it to GPU.
+    // Load the environment textures
     this._texture = await Texture2D.load(
       'assets/env/Alexs_Apt_2k-diffuse-RGBM.png'
       //'assets/env/interior-diffuse-RGBM.png'
@@ -95,6 +145,8 @@ class Application {
     canvas.addEventListener('pointermove', this._camera.onPointerMove.bind(this._camera), true);
     canvas.addEventListener('pointerup', this._camera.onPointerUp.bind(this._camera), true);
     canvas.addEventListener('pointerleave', this._camera.onPointerUp.bind(this._camera), true);
+
+    this._context.compileProgram(this._shader);
   }
 
   /**
@@ -151,60 +203,6 @@ class Application {
         this._context.draw(this._geometry, this._shader, this._uniforms);
       }
     }
-
-    // Create our lights
-    const lights: PointLight[] = [];
-
-    /*const topLight = new PointLight()
-      .setPosition(0, 7, 5)
-      .setColorRGB(1.0, 1.0, 1.0)
-      .setIntensity(10.0);
-    lights.push(topLight);
-
-    const sideLight = new PointLight()
-      .setPosition(8, -1, 5)
-      .setColorRGB(1.0, 0.1, 0.1)
-      .setIntensity(3.0);
-    lights.push(sideLight);*/
-
-
-    const cyan: [number, number, number] = [0, 1.0, 0.95];
-    //const white: [number, number, number] = [1.0, 1.0, 1.0];
-    const topLeftLight = new PointLight()
-      .setPosition(-6, 6, 5)
-      .setColorRGB(...cyan)
-      .setIntensity(10.0);
-    lights.push(topLeftLight);
-
-    const topRightLight = new PointLight()
-      .setPosition(6, 6, 5)
-      .setColorRGB(...cyan)
-      .setIntensity(10.0);
-    lights.push(topRightLight);
-
-    const bottomLeftLight = new PointLight()
-      .setPosition(-6, -6, 5)
-      .setColorRGB(...cyan)
-      .setIntensity(10.0);
-    lights.push(bottomLeftLight);
-
-    const bottomRightLight = new PointLight()
-      .setPosition(6, -6, 5)
-      .setColorRGB(...cyan)
-      .setIntensity(10.0);
-    lights.push(bottomRightLight);
-
-    this._shader.pointLightCount = lights.length;
-    this._context.compileProgram(this._shader);
-
-    // Set the lights uniforms
-    for (let i = 0; i < lights.length; i++) {
-      this._uniforms[`uPointLights[${i}].positionWS`] = lights[i].positionWS;
-      this._uniforms[`uPointLights[${i}].color`] = lights[i].color;
-      this._uniforms[`uPointLights[${i}].intensity`] = lights[i].intensity;
-    }
-
-    this._context.draw(this._geometry, this._shader, this._uniforms);
   }
 }
 
