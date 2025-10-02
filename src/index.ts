@@ -105,6 +105,13 @@ class Application {
       this._uniforms[`uPointLights[${i}].intensity`] = lights[i].intensity;
     }
 
+    // Handle keyboard and mouse inputs to translate and rotate camera.
+    canvas.addEventListener('keydown', this._camera.onKeyDown.bind(this._camera), true);
+    canvas.addEventListener('pointerdown', this._camera.onPointerDown.bind(this._camera), true);
+    canvas.addEventListener('pointermove', this._camera.onPointerMove.bind(this._camera), true);
+    canvas.addEventListener('pointerup', this._camera.onPointerUp.bind(this._camera), true);
+    canvas.addEventListener('pointerleave', this._camera.onPointerUp.bind(this._camera), true);
+
     // Compile before loading textures to prevent GL errors
     this._context.uploadGeometry(this._geometry);
     this._context.compileProgram(this._shader);
@@ -138,13 +145,6 @@ class Application {
       // You can then use it directly as a uniform:
       this._uniforms['uBRDFTexture'] = this._texture;
     }
-
-    // Handle keyboard and mouse inputs to translate and rotate camera.
-    canvas.addEventListener('keydown', this._camera.onKeyDown.bind(this._camera), true);
-    canvas.addEventListener('pointerdown', this._camera.onPointerDown.bind(this._camera), true);
-    canvas.addEventListener('pointermove', this._camera.onPointerMove.bind(this._camera), true);
-    canvas.addEventListener('pointerup', this._camera.onPointerUp.bind(this._camera), true);
-    canvas.addEventListener('pointerleave', this._camera.onPointerUp.bind(this._camera), true);
 
     this._context.compileProgram(this._shader);
   }
