@@ -5,8 +5,13 @@ import { SphereGeometry } from './geometries/sphere';
 import { GLContext } from './gl';
 import { PBRShader } from './shader/pbr-shader';
 import { Texture, Texture2D } from './textures/texture';
-import { UniformType } from './types';
+import { PixelArray, UniformType } from './types';
 import { PointLight } from './lights/lights';
+
+// For init Shader (Diffuse Generation)
+import { Shader } from './shader/shader';
+import initVertex from './shader/init.vert';
+import initFragment from './shader/init.frag';
 
 // GUI elements
 interface GUIProperties {
@@ -21,9 +26,12 @@ interface GUIProperties {
 class Application {
   private _context: GLContext; // Context used to draw to the canvas
   private _shader: PBRShader;
+  private _initShader: Shader;
   private _geometry: SphereGeometry;
   private _uniforms: Record<string, UniformType | Texture>;
+  private _initUniforms: Record<string, UniformType | Texture>;
   private _texture: Texture2D<HTMLElement> | null;
+  private _diffuseTexture: Texture2D<PixelArray> | null;
   private _camera: Camera;
   private _guiProperties: GUIProperties; // Object updated with the properties from the GUI
 
@@ -33,13 +41,16 @@ class Application {
     this._camera = new Camera(0.0, 0.0, 18.0);
     this._geometry = new SphereGeometry();
     this._shader = new PBRShader();
+    this._initShader = new Shader(initVertex, initFragment);
     this._texture = null;
+    this._diffuseTexture = null;
     this._uniforms = {
       'uMaterial.albedo': vec3.create(),
       'uModel.LS_to_WS': mat4.create(),
       'uCamera.WS_to_CS': mat4.create(),
       'uCamera.positionWS': this._camera._position,
     };
+    this._initUniforms = {};
 
     // Set GUI default values
     this._guiProperties = {
@@ -56,6 +67,62 @@ class Application {
    * Initializes the application.
    */
   async init() {
+    // Compile before loading textures to prevent GL errors
+    this._context.uploadGeometry(this._geometry);
+    this._context.compileProgram(this._initShader);
+    this._context.compileProgram(this._shader);
+
+    ///////////////////
+    /// Init Shader ///
+    ///////////////////
+
+    const gl = this._context.gl;
+
+    // Load the unfiltered environnement texture for diffuse generation
+    this._texture = await Texture2D.load(
+      'assets/thatch_chapel_2k-RGBM.png'
+    );
+    if (this._texture !== null) {
+      this._context.uploadTexture(this._texture);
+      this._initUniforms['uEnvironnementTexture'] = this._texture;
+    }
+
+    // Create empty texture to store the diffuse convolution result
+    this._diffuseTexture = new Texture2D<PixelArray>(
+      new Uint8Array(2048 * 1024 * 4),
+      2048,
+      1024,
+      gl.RGBA,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE
+    );
+    this._context.uploadTexture(this._diffuseTexture);
+
+    // Create FBO to store to texture
+    const framebuffer = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+    this._context.setFramebufferTexture(this._diffuseTexture);
+
+    // Set viewport for offscreen rendering
+    this._context.setViewport(2048, 1024);
+
+    // Render with init shader to generate diffuse
+    this._context.draw(this._geometry, this._initShader, this._initUniforms);
+
+    // Unbind framebuffer (back to default)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    this._context.resetViewport();
+
+    // Clean up
+    gl.deleteFramebuffer(framebuffer);
+
+    /////////////////
+    /// Rendering ///
+    /////////////////
+
+    // Use generated diffuse texture in PBR shader
+    this._uniforms['uDiffuseTexture'] = this._diffuseTexture;
+
     // Create the point lights
     const lights: PointLight[] = [];
     const cyan: [number, number, number] = [0, 1.0, 0.95];

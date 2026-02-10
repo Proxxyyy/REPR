@@ -31,6 +31,7 @@ struct PointLight
 };
 uniform PointLight uPointLights[POINT_LIGHT_COUNT];
 
+uniform sampler2D uEnvironnementTexture;
 uniform sampler2D uDiffuseTexture;
 uniform sampler2D uSpecularTexture;
 uniform sampler2D uBRDFTexture;
@@ -166,7 +167,8 @@ void main()
   vec3 ks = F;
   vec3 kd = (1.0 - ks) * (1.0 - metallic);
 
-  vec3 diffuse = kd * albedo * RGBMDecode(texture(uDiffuseTexture, ToUV(n)));
+  vec3 diffuse = kd * albedo * RGBMDecode(texture(uEnvironnementTexture, ToUV(n)));
+  //vec3 diffuse = kd * albedo * RGBMDecode(texture(uDiffuseTexture, ToUV(n)));
 
   vec2 reflected = ToUV(reflect(w_o, n));
 
